@@ -50,21 +50,29 @@ def calc_seq_err_robust(results, rect_anno):
     center = [[r[0]+(r[2]-1)/2.0, r[1]+(r[3]-1)/2.0] for r in rectMat]
     errCenter = [round(scripts.butil.ssd(center[i], centerGT[i]),4)
         for i in range(seq_length)]
-
+    # only process data that all positive.
     idx = [sum([x>0 for x in r])==4 for r in rect_anno]
+
+    # tmp is the overlap scores of all result.
     tmp = calc_rect_int(rectMat, rect_anno)
     errCoverage = [-1] * seq_length
     totalerrCoverage = 0
     totalerrCenter = 0
 
     for i in range(seq_length):
+        # only process data that all positive.(the valid data.)
         if idx[i]:
+            # if all data valid. errCoverage is the overlap scores of all result.
+            # if not. errCoverage is -1 for invalid data.
             errCoverage[i] = tmp[i]
+
+            # the sum of all valid data's overlap scores
             totalerrCoverage += errCoverage[i]
             totalerrCenter += errCenter[i]
         else:
             errCenter[i] = -1
 
+    # the avg of all valid data's overlap scores
     aveErrCoverage = totalerrCoverage / float(sum(idx))
     aveErrCenter = totalerrCenter / float(sum(idx))
 

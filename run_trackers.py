@@ -3,6 +3,7 @@ import getopt
 import numpy as np
 from PIL import Image
 from config import *
+# print os.path.abspath('.')
 from scripts import *
 
 def main(argv):
@@ -69,8 +70,11 @@ def main(argv):
                 for attr in attrList:
                     print "\t\'{0}\'".format(attr.name),
                     print "\toverlap : {0:02.1f}%".format(attr.overlap),
-                    print "\tfailures : {0:.1f}".format(attr.error)
-
+                    print "\tfailures : {0:.1f}".format(attr.error),
+                    if len(attr.successRateList) > 0:
+                        print "\t0.5avgSuccessRate : {0:.3f}".format(attr.successRateList[10])  # TODO: attention towards 10 and the definition correctness of the successRateList
+                    else:
+                        print "\t0.5avgSuccessRate : {0:.3f}".format(0)
                 if SAVE_RESULT : 
                     butil.save_scores(attrList, testname)
 
@@ -114,6 +118,7 @@ def run_trackers(trackers, seqs, evalType, shiftTypeSet):
                     
                 os.chdir(TRACKER_SRC + t)
                 funcName = 'run_{0}(subS, rp, SAVE_IMAGE)'.format(t)
+
                 try:
                     res = eval(funcName)
                 except:

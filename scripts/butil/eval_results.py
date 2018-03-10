@@ -34,6 +34,9 @@ def calc_result(tracker, seqs, results, evalType):
                         result.endFrame]
 
             print '{0} : eval {1}'.format(tracker, seq.name)
+            # aveCoverage is the avg of all valid data's overlap scores
+            # if all data valid. errCoverage is the overlap scores of all frame.
+            # if not. errCoverage is -1 for invalid data.
             aveCoverage, aveErrCenter, errCoverage, errCenter = \
                 scripts.butil.calc_seq_err_robust(result, anno)
             seq.aveCoverage.append(aveCoverage)
@@ -68,10 +71,16 @@ def calc_result(tracker, seqs, results, evalType):
                     seqSuccess = [score for score in seq.errCoverage \
                         if score > threshold]
                     seqSuccessList.append(len(seqSuccess)/float(length))
+
+                # seqSuccessList[10] is > 0.5 items.
+                # successRateList is the success rate list.
                 successRateList.append(seqSuccessList)
 
                 overlapList = [score for score in seq.errCoverage 
-                    if score > 0]
+                    if score > 0]  # TODO: unc for not concerning about the score=0 condition
+
+
+                # overlapScore of the seq is average of all positive(zero not included) overlap score in the seq.
                 overlapScore = sum(overlapList) / len(overlapList)
                 attr.overlapScores.append(overlapScore)	
 
@@ -82,11 +91,14 @@ def calc_result(tracker, seqs, results, evalType):
             # end if
         # end for seqs
         if len(attr.overlapScores) > 0 :
+            # avg overlapscore of all relevant seq.
             attr.overlap = sum(attr.overlapScores) / len(attr.overlapScores) * 100
 
         if len(attr.errorNum) > 0 :
             attr.error = sum(attr.errorNum) / len(attr.errorNum)
 
+        # attr.successRateList: cal all attr-relevant seq's successRateList, avg them element-wise.
+        # avg success rate list of all lists element-wise.
         if len(successRateList) > 0:
             for i in range(len(thresholdSetOverlap)):
                 attr.successRateList.append(
