@@ -1,0 +1,15 @@
+result
+result_fig
+models/tmp
+tracking/tmp
+modules/*.pyc
+pretrain/*.pyc
+tracking/*.pyc
+models/imagenet-vgg-m.mat
+.idea/
+tracking/.idea/
+dataset/*
+.DS_Store
+models/mdnet_vot-otb_new.pth
+pretrain/test.py
+models/mdnet_vot_otb*.pth
