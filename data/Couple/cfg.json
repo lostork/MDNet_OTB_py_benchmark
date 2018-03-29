@@ -1,6 +1,6 @@
 {
   "name": "Couple", 
-  "path": "./tracker_benchmark/data/Couple/img/", 
+  "path": "./data/Couple/img/", 
   "startFrame": 1, 
   "endFrame": 140, 
   "attributes": [

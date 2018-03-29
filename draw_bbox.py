@@ -77,7 +77,9 @@ def main():
             continue
 
         seq = butil.load_seq_config(result.seqName)
-        res = butil.res_to_rect(result)
+        # TODO: unc;
+        #res = butil.res_to_rect(result)
+        res = result.res
         startFrame = result.startFrame
         view_result(seq, res, startFrame)
     
@@ -98,7 +100,7 @@ def view_result(seq, res, startIndex):
       linewidth=5, edgecolor="#00ff00", zorder=1, fill=False)
     plt.gca().add_patch(rect)
     plt.gca().add_patch(gtRect)
-
+    plt.savefig("%d.jpg" % (0))
     def update_fig(num, startIndex, res, gt, src, startFrame):    
         r = res[num]
         g = gt[num+startIndex-startFrame]
@@ -113,10 +115,11 @@ def view_result(seq, res, startIndex):
         gtRect.set_xy((gx,gy))
         gtRect.set_width(gw)
         gtRect.set_height(gh)
+        plt.savefig("%d.jpg" % (num+startIndex-startFrame))
         return im, rect, gtRect
 
     ani = animation.FuncAnimation(fig, update_fig, 
-        frames=len(res), fargs=(startIndex, res, seq.gtRect, src, seq.startFrame), interval=10, blit=True)
+        frames=len(res), fargs=(startIndex, res, seq.gtRect, src, seq.startFrame), interval=200, blit=True)
     plt.axis("off")
     plt.show()
 

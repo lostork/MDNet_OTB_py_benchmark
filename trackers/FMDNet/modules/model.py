@@ -29,11 +29,12 @@ def append_params(params, module, prefix):
             else:
                 raise RuntimeError("Duplicated param name: %s" % (name))
 
+
 def classify_from_feat(feat, classifer, branches, k):
 
     # TODO:unc; is this change fusion feat
     # TODO: before_fc_feats is not stable
-    before_fc_feats = None
+    before_fc_feats = feat.clone()  # TODO: may have problem
     out = feat
     for name, module in classifer.named_children():
         out = module(out)
@@ -110,24 +111,22 @@ class MDNet(nn.Module):
         ]))
 
         self.conv1_feat_extractor = nn.Sequential(OrderedDict([
-            ('fe1_conv', nn.Sequential(nn.Conv2d(96, 16, kernel_size=1, stride=1))),
-            ('fe1_deconv', nn.Sequential(nn.Upsample((51, 51), mode='bilinear'))) #TODO:have better impl
+            ('fe1_conv', nn.Sequential(nn.Conv2d(96, 96, kernel_size=7, stride=2),
+                                       nn.MaxPool2d(kernel_size=3, stride=3)))   # TODO: output size check.
         ]))
 
         self.conv2_feat_extractor = nn.Sequential(OrderedDict([
-            ('fe2_conv', nn.Sequential(nn.Conv2d(256, 16, kernel_size=1, stride=1))),
-            ('fe2_deconv', nn.Sequential(nn.Upsample((51,51), mode='bilinear')))    #TODO:unc;
+            ('fe2_conv', nn.Sequential(nn.Conv2d(256, 256, kernel_size=3, stride=1)))
         ]))
 
-        self.conv3_feat_extractor = nn.Sequential(OrderedDict([
-            ('fe3_conv', nn.Sequential(nn.Conv2d(512, 16, kernel_size=1, stride=1))),
-            ('fe3_deconv', nn.Sequential(nn.Upsample((51,51), mode='bilinear')))
-        ]))
+        # self.conv3_feat_extractor = nn.Sequential(OrderedDict([
+        #     ('fe3_conv', nn.Sequential(nn.Conv2d(512, 16, kernel_size=1, stride=1))),
+        #     ('fe3_deconv', nn.Sequential(nn.Upsample((51,51), mode='bilinear')))
+        # ]))
 
         self.conv1_classifier = nn.Sequential(OrderedDict([
-            ('cl1_conv', nn.Sequential(nn.Conv2d(16, 2, kernel_size=1, stride=1))),
             ('cl1_fc4',   nn.Sequential(nn.Dropout(0.5),
-                                    nn.Linear(51 * 51 * 2, 512),
+                                    nn.Linear(3 * 3 * 96, 512),
                                     nn.ReLU())),
             ('cl1_fc5',   nn.Sequential(nn.Dropout(0.5),
                                     nn.Linear(512, 512),
@@ -135,9 +134,8 @@ class MDNet(nn.Module):
         ]))
 
         self.conv2_classifier = nn.Sequential(OrderedDict([
-            ('cl2_conv', nn.Sequential(nn.Conv2d(16, 2, kernel_size=1, stride=1))),
             ('cl2_fc4', nn.Sequential(nn.Dropout(0.5),
-                                      nn.Linear(51 * 51 * 2, 512),
+                                      nn.Linear(3 * 3 * 256, 512),
                                       nn.ReLU())),
             ('cl2_fc5', nn.Sequential(nn.Dropout(0.5),
                                       nn.Linear(512, 512),
@@ -145,9 +143,8 @@ class MDNet(nn.Module):
         ]))
 
         self.conv3_classifier = nn.Sequential(OrderedDict([
-            ('cl3_conv', nn.Sequential(nn.Conv2d(16, 2, kernel_size=1, stride=1))),
             ('cl3_fc4', nn.Sequential(nn.Dropout(0.5),
-                                      nn.Linear(51 * 51 * 2, 512),
+                                      nn.Linear(3 * 3 * 512, 512),
                                       nn.ReLU())),
             ('cl3_fc5', nn.Sequential(nn.Dropout(0.5),
                                       nn.Linear(512, 512),
@@ -155,9 +152,9 @@ class MDNet(nn.Module):
         ]))
 
         self.fusion_classifier = nn.Sequential(OrderedDict([
-            ('fusion_conv', nn.Sequential(nn.Conv2d(48, 2, kernel_size=1, stride=1))),
+            ('fusion_conv', nn.Sequential(nn.Conv2d(96+256+512, 512, kernel_size=1, stride=1))),
             ('fusion_fc4', nn.Sequential(nn.Dropout(0.5),
-                                      nn.Linear(51 * 51 * 2, 512),
+                                      nn.Linear(3 * 3 * 512, 512),
                                       nn.ReLU())),
             ('fusion_fc5', nn.Sequential(nn.Dropout(0.5),
                                       nn.Linear(512, 512),
@@ -167,7 +164,7 @@ class MDNet(nn.Module):
         self.shared_layers = [self.cnn_layers,
                               self.conv1_feat_extractor,
                               self.conv2_feat_extractor,
-                              self.conv3_feat_extractor,
+                              # self.conv3_feat_extractor,
                               self.conv1_classifier,
                               self.conv2_classifier,
                               self.conv3_classifier,
@@ -199,8 +196,8 @@ class MDNet(nn.Module):
             if os.path.splitext(model_path)[1] == '.pth':
                 # load pretrained shared layer parameters
                 self.load_model(model_path)
-        #     elif os.path.splitext(model_path)[1] == '.mat':
-        #         self.load_mat_model(model_path)
+            elif os.path.splitext(model_path)[1] == '.mat':
+                self.load_mat_model(model_path)
             else:
                 raise RuntimeError("Unknown model format: %s" % (model_path))
 
@@ -272,12 +269,13 @@ class MDNet(nn.Module):
         conv1_scores = None
         conv2_scores = None
         conv3_scores = None
+        fusion_scores = None
 
         conv1_bf_fc_feats = None
         conv2_bf_fc_feats = None
         conv3_bf_fc_feats = None
 
-        if in_layer in ('conv1', 'before_fc') and (out_layer in ('fusion', 'fusion_feats_only', 'combined_feats')):
+        if in_layer in ('conv1', 'before_fc') and (out_layer in ('fusion', 'fusion_feats_only', 'combined_feats', 'conv3')):
             if in_layer == 'conv1':
                 for name, module in self.cnn_layers.named_children():
                     if name == 'conv1':
@@ -290,7 +288,7 @@ class MDNet(nn.Module):
 
                 conv1_feat = self.conv1_feat_extractor(conv1_feat)
                 conv2_feat = self.conv2_feat_extractor(conv2_feat)
-                conv3_feat = self.conv3_feat_extractor(conv3_feat)
+                # conv3_feat = self.conv3_feat_extractor(conv3_feat)
 
                 #TODO:unc;
                 fusion_feat = torch.cat((conv1_feat, conv2_feat, conv3_feat), 1)
@@ -316,16 +314,10 @@ class MDNet(nn.Module):
                 if out_layer == 'fusion_feats_only':
                     return fusion_bf_fc_feats
 
-                conv1_scores, conv1_bf_fc_feats = classify_from_feat(conv1_feat, self.conv1_classifier, self.cl1_branches, k)
-                conv2_scores, conv2_bf_fc_feats = classify_from_feat(conv2_feat, self.conv2_classifier, self.cl2_branches, k)
-                conv3_scores, conv3_bf_fc_feats = classify_from_feat(conv3_feat, self.conv3_classifier, self.cl3_branches, k)
-
                 if out_layer == 'combined_feats':
                     # TODO: unc;
-                    combined_feats = torch.cat((conv1_bf_fc_feats.unsqueeze(1),
-                                                conv2_bf_fc_feats.unsqueeze(1),
-                                                conv3_bf_fc_feats.unsqueeze(1),
-                                                fusion_bf_fc_feats.unsqueeze(1)), 1)
+                    combined_feats = torch.cat((fusion_feat,
+                                                fusion_bf_fc_feats.view(-1, 512, 3, 3)), 1)
 
                     # print (combined_feats[1,1,:] == conv2_bf_fc_feats[1,:])
                     # print combined_feats[1,1,:].size()
@@ -334,12 +326,28 @@ class MDNet(nn.Module):
 
                     return combined_feats
 
-            elif in_layer == 'before_fc':
-                conv1_bf_fc_feats = x[:,0,:]
-                conv2_bf_fc_feats = x[:,1,:]
-                conv3_bf_fc_feats = x[:,2,:]
-                fusion_bf_fc_feats = x[:,3,:]
+                conv1_scores, conv1_bf_fc_feats = classify_from_feat(conv1_feat.view(conv1_feat.size(0), -1), self.conv1_classifier, self.cl1_branches, k)
+                conv2_scores, conv2_bf_fc_feats = classify_from_feat(conv2_feat.view(conv2_feat.size(0), -1), self.conv2_classifier, self.cl2_branches, k)
+                conv3_scores, conv3_bf_fc_feats = classify_from_feat(conv3_feat.view(conv3_feat.size(0), -1), self.conv3_classifier, self.cl3_branches, k)
 
+                if out_layer == 'conv3':
+                    return conv3_bf_fc_feats
+
+
+
+            elif in_layer == 'before_fc':
+                # conv1_bf_fc_feats = x[:,0,:]
+                # conv2_bf_fc_feats = x[:,1,:]
+                # conv3_bf_fc_feats = x[:,2,:]
+                # fusion_bf_fc_feats = x[:,3,:]
+                conv1_bf_fc_feats = x[:,0:96,:,:].clone() # TODO: maybe more check.
+                conv1_bf_fc_feats = conv1_bf_fc_feats.view(conv1_bf_fc_feats.size(0), -1)
+                conv2_bf_fc_feats = x[:,96:352,:,:].clone()
+                conv2_bf_fc_feats = conv2_bf_fc_feats.view(conv2_bf_fc_feats.size(0), -1)
+                conv3_bf_fc_feats = x[:,352:864,:,:].clone()
+                conv3_bf_fc_feats = conv3_bf_fc_feats.view(conv3_bf_fc_feats.size(0), -1)
+                fusion_bf_fc_feats = x[:,864:1376,:,:].clone()
+                fusion_bf_fc_feats = fusion_bf_fc_feats.view(fusion_bf_fc_feats.size(0), -1)
 
                 conv1_scores = classify_from_bf_fc_feat(conv1_bf_fc_feats, self.conv1_classifier, self.cl1_branches, k)
                 conv2_scores = classify_from_bf_fc_feat(conv2_bf_fc_feats, self.conv2_classifier, self.cl2_branches, k)
@@ -391,7 +399,7 @@ class MDNet(nn.Module):
         self.cnn_layers.load_state_dict(states['cnn_layers'])
         self.conv1_feat_extractor.load_state_dict(states['conv1_feat_extractor'])
         self.conv2_feat_extractor.load_state_dict(states['conv2_feat_extractor'])
-        self.conv3_feat_extractor.load_state_dict(states['conv3_feat_extractor'])
+        # self.conv3_feat_extractor.load_state_dict(states['conv3_feat_extractor'])
         self.conv1_classifier.load_state_dict(states['conv1_classifier'])
         self.conv2_classifier.load_state_dict(states['conv2_classifier'])
         self.conv3_classifier.load_state_dict(states['conv3_classifier'])

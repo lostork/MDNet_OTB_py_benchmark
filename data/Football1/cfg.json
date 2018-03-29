@@ -1,6 +1,6 @@
 {
   "name": "Football1", 
-  "path": "./tracker_benchmark/data/Football1/img/", 
+  "path": "./data/Football1/img/", 
   "startFrame": 1, 
   "endFrame": 74, 
   "attributes": [

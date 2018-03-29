@@ -1,6 +1,6 @@
 {
   "name": "Crossing", 
-  "path": "./tracker_benchmark/data/Crossing/img/", 
+  "path": "./data/Crossing/img/", 
   "startFrame": 1, 
   "endFrame": 120, 
   "attributes": [
